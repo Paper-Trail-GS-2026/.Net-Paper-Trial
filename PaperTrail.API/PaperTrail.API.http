@@ -1,0 +1,10 @@
+@baseUrl = http://localhost:5180
+@token = replace-with-java-token
+
+GET {{baseUrl}}/preparativos?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+###
+
+GET {{baseUrl}}/preparativos/101
+Authorization: Bearer {{token}}
