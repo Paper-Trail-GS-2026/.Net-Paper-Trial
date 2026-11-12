@@ -59,6 +59,7 @@ O Swagger fica em `http://localhost:5180/swagger`. Obtenha um token em
 | --- | --- | --- |
 | GET | `/preparativos?page=1&pageSize=20` | Listar os preparativos do usuário autenticado |
 | GET | `/preparativos/{id}` | Consultar um preparativo do usuário autenticado |
+| POST | `/preparativos` | Criar um preparativo com os itens do catálogo Java |
 
 A paginação começa em 1 e aceita até 100 registros por página.
 As rotas exigem o papel `CITIZEN` ou `MANAGER`. O proprietário vem do `sub` do JWT;
@@ -69,7 +70,35 @@ Os tokens precisam usar RS256, emissor `papertrail`, audiência `papertrail-api`
 expiração válida, `sub` com o ID positivo do usuário e a lista `roles`.
 
 A carga de demonstração do banco usa proprietários fictícios. Um usuário recém-criado
-no Java recebe uma lista vazia até ter preparativos vinculados ao seu ID.
+no Java recebe uma lista vazia até criar seus preparativos.
+
+## Criar um preparativo
+
+Envie o token Java, uma chave de idempotência e o serviço desejado:
+
+```http
+POST /preparativos
+Authorization: Bearer <token>
+Idempotency-Key: preparativo-001
+Content-Type: application/json
+
+{"serviceId":1,"title":"Meu atendimento"}
+```
+
+O proprietário vem do JWT. A versão e os itens vêm do snapshot do Java, incluindo
+os requisitos opcionais. Todos os itens começam sem conclusão. O retorno é 201,
+com o cabeçalho `Location` apontando para o preparativo criado.
+
+`Idempotency-Key` é obrigatório: um valor de 1 a 128 caracteres ASCII visíveis,
+sem espaços ou vírgulas. A chave vale para o usuário e a operação de criação.
+Repetir a mesma chave e os mesmos valores devolve o status, o corpo e o `Location`
+originais, sem consultar o Java novamente. O título é comparado após remover
+espaços nas pontas. Alterar o título ou `serviceId` usando a mesma chave retorna 409.
+
+O snapshot é consultado antes da transação de escrita. Preparativo, itens e resposta
+idempotente são gravados juntos. Se a criação falhar, a transação é revertida e a
+chave pode ser usada em uma nova tentativa. Requisições concorrentes com a mesma
+chave mantêm uma única criação confirmada no banco.
 
 ## Integração com Java
 
@@ -92,11 +121,13 @@ Os testes geram um par RSA temporário e usam persistência e respostas HTTP loc
 Não precisam de senha Oracle, chave privada do Java ou serviços externos em execução.
 Os testes de mapeamento conferem a tradução SQL para Oracle; a execução no banco real
 é uma verificação separada.
+Os testes de criação usam SQLite temporário para conferir transações, concorrência,
+restrição de chave única e rollback da auditoria. A validação específica no Oracle
+é feita separadamente, em tabelas isoladas de teste.
 
 ## Próximas etapas
 
-Criação, edição e exclusão de preparativos, carga inicial dos itens pelo snapshot e
-idempotência ainda serão implementadas. Também estão pendentes os endpoints de itens
+Edição e exclusão de preparativos ainda serão implementadas. Também estão pendentes os endpoints de itens
 e progresso, rate limiting, health checks e o consumidor de eventos.
 
 Os arquivos de Database ficam em `docs/database`, com o mesmo conteúdo do repositório

@@ -26,6 +26,7 @@ public static class PaperTrailServiceCollectionExtensions
     public static IServiceCollection AddPaperTrailRepositories(this IServiceCollection services)
     {
         services.AddScoped<IPreparationRepository, PreparationRepository>();
+        services.AddScoped<IPreparationCreationRepository, PreparationCreationRepository>();
         services.AddScoped<IServiceVersionRepository, ServiceVersionRepository>();
         return services;
     }

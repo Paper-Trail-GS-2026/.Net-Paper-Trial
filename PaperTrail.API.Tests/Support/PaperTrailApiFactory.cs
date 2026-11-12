@@ -12,7 +12,7 @@ using PaperTrail.Domain.Entities;
 
 namespace PaperTrail.API.Tests.Support;
 
-public sealed class PaperTrailApiFactory : WebApplicationFactory<Program>
+public class PaperTrailApiFactory : WebApplicationFactory<Program>
 {
     private readonly RSA _rsa = RSA.Create(2048);
     private readonly string _keyDirectory = Path.Combine(Path.GetTempPath(), $"papertrail-api-tests-{Guid.NewGuid():N}");

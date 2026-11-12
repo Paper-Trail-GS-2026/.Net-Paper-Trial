@@ -14,6 +14,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             DomainException domain => (StatusCodes.Status400BadRequest, domain.Message),
             BadHttpRequestException => (StatusCodes.Status400BadRequest, "Invalid request."),
             ResourceNotFoundException notFound => (StatusCodes.Status404NotFound, notFound.Message),
+            ConflictException conflict => (StatusCodes.Status409Conflict, conflict.Message),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Authentication required."),
             CatalogUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Catalog service is unavailable."),
             DbException => (StatusCodes.Status503ServiceUnavailable, "Database is unavailable."),
