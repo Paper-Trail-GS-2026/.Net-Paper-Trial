@@ -1,4 +1,5 @@
 using PaperTrail.API.Endpoints;
+using PaperTrail.API.Endpoints.Checklist;
 using PaperTrail.API.Exceptions;
 using PaperTrail.API.Extensions;
 
@@ -12,6 +13,7 @@ public partial class Program
         builder.Services.AddPaperTrailDbContext();
         builder.Services.AddPaperTrailRepositories();
         builder.Services.AddPaperTrailApplicationServices();
+        builder.Services.AddPaperTrailChecklist();
         builder.Services.AddPaperTrailCatalogClient();
         builder.Services.AddPaperTrailAuthentication();
         builder.Services.AddPaperTrailSwagger();
@@ -36,6 +38,7 @@ public partial class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapPreparationEndpoints();
+        app.MapChecklistEndpoints();
         app.Run();
     }
 }
