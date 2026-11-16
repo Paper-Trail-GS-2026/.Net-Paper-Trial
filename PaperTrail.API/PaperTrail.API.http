@@ -1,5 +1,6 @@
 @baseUrl = http://localhost:5180
 @token = replace-with-java-token
+@preparationId = replace-with-created-preparation-id
 
 GET {{baseUrl}}/preparativos?page=1&pageSize=20
 Authorization: Bearer {{token}}
@@ -17,3 +18,16 @@ Idempotency-Key: preparativo-001
 Content-Type: application/json
 
 {"serviceId":1,"title":"Meu atendimento"}
+
+###
+
+PUT {{baseUrl}}/preparativos/{{preparationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"title":"Documentos para meu atendimento"}
+
+###
+
+DELETE {{baseUrl}}/preparativos/{{preparationId}}
+Authorization: Bearer {{token}}

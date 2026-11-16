@@ -91,4 +91,10 @@ public sealed class TestPreparationRepository : IPreparationRepository
 
     public Task<Preparation?> GetByIdAndOwnerAsync(long id, string ownerSubject, CancellationToken cancellationToken) =>
         Task.FromResult(_preparations.SingleOrDefault(p => p.Id == id && p.OwnerSubject == ownerSubject));
+
+    public Task<bool> RenameAsync(Preparation preparation, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Use the database factory for write tests.");
+
+    public Task<bool> DeleteAsync(long id, string ownerSubject, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Use the database factory for write tests.");
 }

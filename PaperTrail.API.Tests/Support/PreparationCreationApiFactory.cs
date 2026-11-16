@@ -23,6 +23,7 @@ public sealed class PreparationCreationApiFactory : PaperTrailApiFactory
     public TestCatalog Catalog { get; } = new();
     public WriteFailureInterceptor Failures { get; } = new();
     public StaleIdempotencyReadInterceptor StaleReads { get; } = new();
+    public DeleteFailureInterceptor DeleteFailures { get; } = new();
 
     public PreparationCreationApiFactory()
     {
@@ -48,9 +49,11 @@ public sealed class PreparationCreationApiFactory : PaperTrailApiFactory
               PAYLOAD_HASH TEXT NOT NULL, RESPONSE_STATUS INTEGER NOT NULL, RESPONSE_JSON TEXT NOT NULL,
               CREATED_AT TEXT NOT NULL, PRIMARY KEY(OWNER_SUBJECT, OPERATION, IDEMPOTENCY_KEY));
             CREATE TABLE PT_SERVICE_VERSION (SERVICE_ID INTEGER PRIMARY KEY, VERSION INTEGER NOT NULL, UPDATED_AT TEXT NOT NULL);
-            CREATE TABLE PT_ITEM_AUDIT (ID INTEGER PRIMARY KEY AUTOINCREMENT, ITEM_ID INTEGER NOT NULL);
+            CREATE TABLE PT_ITEM_AUDIT (ID INTEGER PRIMARY KEY AUTOINCREMENT, ITEM_ID INTEGER NOT NULL, OPERATION TEXT NOT NULL DEFAULT 'INSERT');
             CREATE TRIGGER ITEM_INSERT_AUDIT AFTER INSERT ON PT_PREPARATION_ITEM
             BEGIN INSERT INTO PT_ITEM_AUDIT(ITEM_ID) VALUES(NEW.ID); END;
+            CREATE TRIGGER ITEM_DELETE_AUDIT AFTER DELETE ON PT_PREPARATION_ITEM
+            BEGIN INSERT INTO PT_ITEM_AUDIT(ITEM_ID, OPERATION) VALUES(OLD.ID, 'DELETE'); END;
             """;
         command.ExecuteNonQuery();
     }
@@ -62,7 +65,7 @@ public sealed class PreparationCreationApiFactory : PaperTrailApiFactory
         {
             services.RemoveAll<PaperTrailContext>();
             services.AddScoped(_ => new PaperTrailContext(new DbContextOptionsBuilder<PaperTrailContext>()
-                .UseSqlite(_connectionString).AddInterceptors(Failures, StaleReads).Options));
+                .UseSqlite(_connectionString).AddInterceptors(Failures, StaleReads, DeleteFailures).Options));
             services.RemoveAll<IPreparationRepository>();
             services.AddScoped<IPreparationRepository, PreparationRepository>();
             services.RemoveAll<IJavaCatalogClient>();
@@ -134,6 +137,19 @@ public sealed class StaleIdempotencyReadInterceptor : DbCommandInterceptor
             // Simulate a read made before another request committed the key.
             command.CommandText = command.CommandText.Replace("WHERE", "WHERE 1 = 0 AND", StringComparison.Ordinal);
         }
+        return ValueTask.FromResult(result);
+    }
+}
+
+public sealed class DeleteFailureInterceptor : DbCommandInterceptor
+{
+    public bool FailParentDelete { get; set; }
+
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+        CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+    {
+        if (FailParentDelete && command.CommandText.Contains("DELETE FROM \"PT_PREPARATION\"", StringComparison.Ordinal))
+            throw new InvalidOperationException("Test failure after item deletion.");
         return ValueTask.FromResult(result);
     }
 }

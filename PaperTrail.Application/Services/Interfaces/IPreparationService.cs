@@ -11,4 +11,9 @@ public interface IPreparationService
         string ownerSubject, PaginationQuery query, CancellationToken cancellationToken);
 
     Task<PreparationResponse> GetByIdAsync(long id, string ownerSubject, CancellationToken cancellationToken);
+
+    Task<PreparationResponse> UpdateAsync(long id, string ownerSubject, UpdatePreparationRequest request,
+        CancellationToken cancellationToken);
+
+    Task DeleteAsync(long id, string ownerSubject, CancellationToken cancellationToken);
 }

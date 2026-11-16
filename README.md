@@ -60,6 +60,8 @@ O Swagger fica em `http://localhost:5180/swagger`. Obtenha um token em
 | GET | `/preparativos?page=1&pageSize=20` | Listar os preparativos do usuário autenticado |
 | GET | `/preparativos/{id}` | Consultar um preparativo do usuário autenticado |
 | POST | `/preparativos` | Criar um preparativo com os itens do catálogo Java |
+| PUT | `/preparativos/{id}` | Alterar o título de um preparativo |
+| DELETE | `/preparativos/{id}` | Excluir um preparativo e seus itens |
 
 A paginação começa em 1 e aceita até 100 registros por página.
 As rotas exigem o papel `CITIZEN` ou `MANAGER`. O proprietário vem do `sub` do JWT;
@@ -100,6 +102,26 @@ idempotente são gravados juntos. Se a criação falhar, a transação é revert
 chave pode ser usada em uma nova tentativa. Requisições concorrentes com a mesma
 chave mantêm uma única criação confirmada no banco.
 
+## Editar e excluir um preparativo
+
+Para alterar o título, envie `PUT /preparativos/{id}` com o token e o corpo:
+
+```json
+{"title":"Documentos para meu atendimento"}
+```
+
+O título aceita de 1 a 160 caracteres após remover espaços nas pontas. A resposta
+é 200 com o preparativo atualizado. Serviço, versão, proprietário e itens são
+mantidos.
+
+`DELETE /preparativos/{id}` retorna 204 e remove o preparativo com seus itens na
+mesma transação. A trilha de auditoria permanece, incluindo as exclusões dos itens.
+Outro usuário recebe 404 nas duas operações, inclusive se tiver o papel `MANAGER`.
+
+A resposta de criação guardada pela chave de idempotência permanece após uma
+edição ou exclusão. Repetir o POST com a chave original devolve aquela resposta,
+sem recriar o preparativo excluído. Use uma nova chave para criar outro preparativo.
+
 ## Integração com Java
 
 `IJavaCatalogClient` consulta `GET /services/{id}/requirements-snapshot`, encaminhando
@@ -127,8 +149,8 @@ restrição de chave única e rollback da auditoria. A validação específica n
 
 ## Próximas etapas
 
-Edição e exclusão de preparativos ainda serão implementadas. Também estão pendentes os endpoints de itens
-e progresso, rate limiting, health checks e o consumidor de eventos.
+Estão pendentes os endpoints de itens e progresso, rate limiting, health checks
+e o consumidor de eventos.
 
 Os arquivos de Database ficam em `docs/database`, com o mesmo conteúdo do repositório
 Java. O PDF ainda aguarda a consolidação final da disciplina.

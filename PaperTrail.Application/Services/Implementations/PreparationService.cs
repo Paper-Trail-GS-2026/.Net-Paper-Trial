@@ -62,4 +62,26 @@ public sealed class PreparationService(IPreparationRepository preparations,
             ?? throw new ResourceNotFoundException("Preparation not found.");
         return PreparationResponse.FromDomain(preparation);
     }
+
+    public async Task<PreparationResponse> UpdateAsync(long id, string ownerSubject, UpdatePreparationRequest request,
+        CancellationToken cancellationToken)
+    {
+        DomainRules.PositiveNumber(id, nameof(id));
+        DomainRules.RequiredText(ownerSubject, 128, nameof(ownerSubject));
+        var title = DomainRules.RequiredText(request.Title, 160, nameof(request.Title));
+        var preparation = await preparations.GetByIdAndOwnerAsync(id, ownerSubject, cancellationToken)
+            ?? throw new ResourceNotFoundException("Preparation not found.");
+        preparation.Rename(title);
+        if (!await preparations.RenameAsync(preparation, cancellationToken))
+            throw new ResourceNotFoundException("Preparation not found.");
+        return PreparationResponse.FromDomain(preparation);
+    }
+
+    public async Task DeleteAsync(long id, string ownerSubject, CancellationToken cancellationToken)
+    {
+        DomainRules.PositiveNumber(id, nameof(id));
+        DomainRules.RequiredText(ownerSubject, 128, nameof(ownerSubject));
+        if (!await preparations.DeleteAsync(id, ownerSubject, cancellationToken))
+            throw new ResourceNotFoundException("Preparation not found.");
+    }
 }

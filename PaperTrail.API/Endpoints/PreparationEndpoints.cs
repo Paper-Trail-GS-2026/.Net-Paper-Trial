@@ -23,6 +23,10 @@ public static class PreparationEndpoints
         group.MapPost("/", CreateAsync).WithName("CreatePreparation").WithSummary("Create a preparation from the Java snapshot")
             .Produces<PreparationResponse>(201).ProducesProblem(400).ProducesProblem(401).ProducesProblem(403)
             .ProducesProblem(404).ProducesProblem(409).ProducesProblem(503);
+        group.MapPut("/{id:long}", UpdateAsync).WithName("UpdatePreparation").WithSummary("Rename your preparation")
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(503);
+        group.MapDelete("/{id:long}", DeleteAsync).WithName("DeletePreparation").WithSummary("Delete your preparation and its items")
+            .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(503);
         return endpoints;
     }
 
@@ -52,5 +56,19 @@ public static class PreparationEndpoints
     {
         var response = await service.GetByIdAsync(id, user.FindFirst("sub")!.Value, cancellationToken);
         return TypedResults.Ok(response);
+    }
+
+    private static async Task<Ok<PreparationResponse>> UpdateAsync(long id, UpdatePreparationRequest request,
+        ClaimsPrincipal user, IPreparationService service, CancellationToken cancellationToken)
+    {
+        var response = await service.UpdateAsync(id, user.FindFirst("sub")!.Value, request, cancellationToken);
+        return TypedResults.Ok(response);
+    }
+
+    private static async Task<NoContent> DeleteAsync(long id, ClaimsPrincipal user,
+        IPreparationService service, CancellationToken cancellationToken)
+    {
+        await service.DeleteAsync(id, user.FindFirst("sub")!.Value, cancellationToken);
+        return TypedResults.NoContent();
     }
 }
