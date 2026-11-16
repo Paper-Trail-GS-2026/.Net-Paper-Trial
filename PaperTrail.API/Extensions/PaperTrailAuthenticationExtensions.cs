@@ -28,6 +28,7 @@ public static class PaperTrailAuthenticationExtensions
                 throw new InvalidOperationException("The RSA public key must have at least 2048 bits.");
             var key = new RsaSecurityKey(rsa.ExportParameters(false));
             options.MapInboundClaims = false;
+            options.SaveToken = true;
             options.IncludeErrorDetails = false;
             options.TokenValidationParameters = new TokenValidationParameters
             {

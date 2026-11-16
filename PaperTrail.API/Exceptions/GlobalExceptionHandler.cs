@@ -14,13 +14,17 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             DomainException domain => (StatusCodes.Status400BadRequest, domain.Message),
             BadHttpRequestException => (StatusCodes.Status400BadRequest, "Invalid request."),
             ResourceNotFoundException notFound => (StatusCodes.Status404NotFound, notFound.Message),
+            ConflictException conflict => (StatusCodes.Status409Conflict, conflict.Message),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Authentication required."),
             CatalogUnavailableException => (StatusCodes.Status503ServiceUnavailable, "Catalog service is unavailable."),
             DbException => (StatusCodes.Status503ServiceUnavailable, "Database is unavailable."),
             _ => (StatusCodes.Status500InternalServerError, "Unable to complete the request.")
         };
         if (status == StatusCodes.Status500InternalServerError)
-            logger.LogError("Request failed with {ExceptionType}. TraceId: {TraceId}", exception.GetType().Name, context.TraceIdentifier);
+            logger.LogError("Request failed with {ExceptionType}. File: {FileName}. TraceId: {TraceId}",
+                exception.GetType().Name,
+                exception is FileNotFoundException missing ? Path.GetFileName(missing.FileName) : null,
+                context.TraceIdentifier);
 
         await Results.Problem(statusCode: status, detail: detail, instance: context.Request.Path).ExecuteAsync(context);
         return true;

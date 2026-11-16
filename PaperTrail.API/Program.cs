@@ -26,7 +26,7 @@ public partial class Program
             await Results.Problem(statusCode: response.StatusCode).ExecuteAsync(context.HttpContext);
         });
 
-        if (app.Environment.IsDevelopment())
+        if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
         {
             app.UseSwagger();
             app.UseSwaggerUI();

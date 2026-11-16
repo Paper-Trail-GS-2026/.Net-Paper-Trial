@@ -8,9 +8,11 @@ public sealed class PaperTrailContext(DbContextOptions<PaperTrailContext> option
     public DbSet<Preparation> Preparations => Set<Preparation>();
     public DbSet<PreparationItem> PreparationItems => Set<PreparationItem>();
     public DbSet<ServiceVersion> ServiceVersions => Set<ServiceVersion>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PaperTrailContext).Assembly);
+        if (Database.IsSqlServer()) SqlServerModelConfiguration.Configure(modelBuilder);
     }
 }

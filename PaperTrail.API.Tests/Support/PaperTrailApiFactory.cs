@@ -12,7 +12,7 @@ using PaperTrail.Domain.Entities;
 
 namespace PaperTrail.API.Tests.Support;
 
-public sealed class PaperTrailApiFactory : WebApplicationFactory<Program>
+public class PaperTrailApiFactory : WebApplicationFactory<Program>
 {
     private readonly RSA _rsa = RSA.Create(2048);
     private readonly string _keyDirectory = Path.Combine(Path.GetTempPath(), $"papertrail-api-tests-{Guid.NewGuid():N}");
@@ -91,4 +91,10 @@ public sealed class TestPreparationRepository : IPreparationRepository
 
     public Task<Preparation?> GetByIdAndOwnerAsync(long id, string ownerSubject, CancellationToken cancellationToken) =>
         Task.FromResult(_preparations.SingleOrDefault(p => p.Id == id && p.OwnerSubject == ownerSubject));
+
+    public Task<bool> RenameAsync(Preparation preparation, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Use the database factory for write tests.");
+
+    public Task<bool> DeleteAsync(long id, string ownerSubject, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Use the database factory for write tests.");
 }

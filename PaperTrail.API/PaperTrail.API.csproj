@@ -9,6 +9,9 @@
     <ProjectReference Include="..\PaperTrail.Infrastructure\PaperTrail.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="startup.sh" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
   </ItemGroup>

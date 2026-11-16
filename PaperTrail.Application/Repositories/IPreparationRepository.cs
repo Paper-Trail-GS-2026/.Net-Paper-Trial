@@ -8,4 +8,8 @@ public interface IPreparationRepository
         string ownerSubject, int page, int pageSize, CancellationToken cancellationToken);
 
     Task<Preparation?> GetByIdAndOwnerAsync(long id, string ownerSubject, CancellationToken cancellationToken);
+
+    Task<bool> RenameAsync(Preparation preparation, CancellationToken cancellationToken);
+
+    Task<bool> DeleteAsync(long id, string ownerSubject, CancellationToken cancellationToken);
 }

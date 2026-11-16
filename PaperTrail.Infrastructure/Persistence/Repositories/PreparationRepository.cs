@@ -19,4 +19,20 @@ public sealed class PreparationRepository(PaperTrailContext context) : IPreparat
     public Task<Preparation?> GetByIdAndOwnerAsync(long id, string ownerSubject, CancellationToken cancellationToken) =>
         context.Preparations.AsNoTracking()
             .SingleOrDefaultAsync(p => p.Id == id && p.OwnerSubject == ownerSubject, cancellationToken);
+
+    public async Task<bool> RenameAsync(Preparation preparation, CancellationToken cancellationToken) =>
+        await context.Preparations.Where(p => p.Id == preparation.Id && p.OwnerSubject == preparation.OwnerSubject)
+            .ExecuteUpdateAsync(update => update.SetProperty(p => p.Title, preparation.Title), cancellationToken) == 1;
+
+    public async Task<bool> DeleteAsync(long id, string ownerSubject, CancellationToken cancellationToken)
+    {
+        var preparation = await context.Preparations.Include(p => p.Items)
+            .SingleOrDefaultAsync(p => p.Id == id && p.OwnerSubject == ownerSubject, cancellationToken);
+        if (preparation is null) return false;
+
+        context.PreparationItems.RemoveRange(preparation.Items);
+        context.Preparations.Remove(preparation);
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }
