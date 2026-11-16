@@ -19,4 +19,14 @@ public sealed class PreparationItem : BaseEntity
         Title = DomainRules.RequiredText(title, 200, nameof(Title));
         Required = required;
     }
+
+    public void Update(string title, bool required)
+    {
+        Title = DomainRules.RequiredText(title, 200, nameof(Title));
+        Required = required;
+    }
+
+    public void Complete() => Completed = true;
+
+    public void Reopen() => Completed = false;
 }
