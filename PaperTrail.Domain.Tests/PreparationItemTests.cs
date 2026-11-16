@@ -36,6 +36,43 @@ public sealed class PreparationItemTests
     }
 
     [Fact]
+    public void CompleteAndReopenChangeOnlyTheState()
+    {
+        var item = new PreparationItem(101, 11, "Documento", true);
+        item.Complete();
+        Assert.True(item.Completed);
+        item.Complete();
+        Assert.True(item.Completed);
+        item.Reopen();
+        Assert.False(item.Completed);
+        Assert.Equal("Documento", item.Title);
+        Assert.True(item.Required);
+    }
+
+    [Fact]
+    public void UpdateChangesTitleAndRequiredButKeepsLinksAndState()
+    {
+        var item = new PreparationItem(101, 11, "Documento", true);
+        item.Complete();
+        item.Update("  Novo título  ", false);
+        Assert.Equal("Novo título", item.Title);
+        Assert.False(item.Required);
+        Assert.True(item.Completed);
+        Assert.Equal(101, item.PreparationId);
+        Assert.Equal(11, item.RequirementId);
+    }
+
+    [Fact]
+    public void InvalidUpdateDoesNotChangeTheItem()
+    {
+        var item = new PreparationItem(101, 11, "Documento", true);
+        Assert.Throws<DomainException>(() => item.Update(" ", false));
+        Assert.Throws<DomainException>(() => item.Update(new string('x', 201), false));
+        Assert.Equal("Documento", item.Title);
+        Assert.True(item.Required);
+    }
+
+    [Fact]
     public void ItemTitleMustBePresentAndFitTheColumn()
     {
         Assert.Throws<DomainException>(() => new PreparationItem(101, 11, " ", true));
