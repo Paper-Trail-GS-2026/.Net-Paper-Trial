@@ -147,6 +147,25 @@ Os testes de criação usam SQLite temporário para conferir transações, conco
 restrição de chave única e rollback da auditoria. A validação específica no Oracle
 é feita separadamente, em tabelas isoladas de teste.
 
+## Integração contínua
+
+O arquivo `azure-pipeline.yml` define o build no Azure Pipelines. Ele instala o SDK
+.NET 10, restaura dependências, compila em Release, executa os testes e publica os
+resultados TRX. O pacote `PaperTrail.API.zip` fica no artefato `api` e só é gerado
+se as etapas anteriores passarem.
+
+No Azure DevOps, importe o repositório para o Azure Repos e crie um pipeline
+apontando para esse arquivo. Na criação, selecione a `develop` enquanto o YAML
+ainda não tiver chegado à `main` por PR. O gatilho automático acompanha somente a `main`.
+Proteja essa branch para receber alterações por PR, exigindo revisor, vínculo
+com Work Item e revisor padrão conforme o RM. Para conferir o pipeline antes do
+primeiro merge, execute-o manualmente na branch de trabalho.
+
+Os testes usam bancos locais temporários e chaves RSA geradas durante a execução.
+O pipeline de build não precisa das credenciais Oracle nem das chaves da aplicação.
+O deploy automático e o provisionamento Azure serão configurados após a definição
+da hospedagem e do banco de dados.
+
 ## Próximas etapas
 
 Estão pendentes os endpoints de itens e progresso, rate limiting, health checks
