@@ -10,7 +10,7 @@ public sealed class PreparationItemConfiguration : IEntityTypeConfiguration<Prep
     {
         builder.ToTable("PT_PREPARATION_ITEM");
         builder.HasKey(i => i.Id).HasName("PK_PT_ITEM");
-        builder.Property(i => i.Id).HasColumnName("ID").HasColumnType("NUMBER(18)").UseIdentityColumn();
+        OraclePropertyBuilderExtensions.UseIdentityColumn(builder.Property(i => i.Id).HasColumnName("ID").HasColumnType("NUMBER(18)"));
         builder.Property(i => i.PreparationId).HasColumnName("PREPARATION_ID").HasColumnType("NUMBER(18)");
         builder.Property(i => i.RequirementId).HasColumnName("REQUIREMENT_ID").HasColumnType("NUMBER(18)");
         builder.Property(i => i.Title).HasColumnName("TITLE").HasColumnType("VARCHAR2(200 CHAR)").IsRequired();

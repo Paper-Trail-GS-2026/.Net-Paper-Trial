@@ -15,10 +15,16 @@ public static class PaperTrailServiceCollectionExtensions
         services.AddDbContext<PaperTrailContext>((provider, options) =>
         {
             var configuration = provider.GetRequiredService<IConfiguration>();
-            var connectionString = configuration.GetConnectionString("PaperTrailOracle");
+            var database = configuration["Database:Provider"] ?? "Oracle";
+            var sqlServer = database.Equals("SqlServer", StringComparison.OrdinalIgnoreCase);
+            if (!sqlServer && !database.Equals("Oracle", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Database:Provider must be Oracle or SqlServer.");
+            var connectionName = sqlServer ? "PaperTrailSqlServer" : "PaperTrailOracle";
+            var connectionString = configuration.GetConnectionString(connectionName);
             if (string.IsNullOrWhiteSpace(connectionString))
-                throw new InvalidOperationException("Configure ConnectionStrings:PaperTrailOracle.");
-            options.UseOracle(connectionString, oracle => oracle.UseOracleSQLCompatibility(OracleSQLCompatibility.DatabaseVersion19));
+                throw new InvalidOperationException($"Configure ConnectionStrings:{connectionName}.");
+            if (sqlServer) options.UseSqlServer(connectionString);
+            else options.UseOracle(connectionString, oracle => oracle.UseOracleSQLCompatibility(OracleSQLCompatibility.DatabaseVersion19));
         });
         return services;
     }

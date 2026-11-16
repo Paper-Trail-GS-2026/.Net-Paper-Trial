@@ -21,7 +21,10 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             _ => (StatusCodes.Status500InternalServerError, "Unable to complete the request.")
         };
         if (status == StatusCodes.Status500InternalServerError)
-            logger.LogError("Request failed with {ExceptionType}. TraceId: {TraceId}", exception.GetType().Name, context.TraceIdentifier);
+            logger.LogError("Request failed with {ExceptionType}. File: {FileName}. TraceId: {TraceId}",
+                exception.GetType().Name,
+                exception is FileNotFoundException missing ? Path.GetFileName(missing.FileName) : null,
+                context.TraceIdentifier);
 
         await Results.Problem(statusCode: status, detail: detail, instance: context.Request.Path).ExecuteAsync(context);
         return true;

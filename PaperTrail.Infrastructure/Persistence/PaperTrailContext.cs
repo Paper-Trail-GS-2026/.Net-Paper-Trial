@@ -13,5 +13,6 @@ public sealed class PaperTrailContext(DbContextOptions<PaperTrailContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PaperTrailContext).Assembly);
+        if (Database.IsSqlServer()) SqlServerModelConfiguration.Configure(modelBuilder);
     }
 }

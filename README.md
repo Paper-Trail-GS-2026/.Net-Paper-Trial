@@ -1,45 +1,75 @@
 # PaperTrail .NET
 
-API de preparativos e checklists do PaperTrail. A autenticação usa o JWT emitido
-pela API Java.
+O PaperTrail é um projeto CitizenTech da Global Solution da FIAP voltado à preparação para atendimentos em serviços públicos. A aplicação reúne requisitos e orientações sobre os serviços para que o cidadão organize o que precisa antes do atendimento.
 
-## Estrutura
+Este repositório contém a API .NET, responsável pelos preparativos do cidadão. Cada preparativo guarda uma cópia dos requisitos de um serviço do catálogo Java, junto com a versão consultada na criação. A autenticação fica no Java; o .NET valida o token do login e restringe o acesso aos preparativos do próprio usuário.
 
-- `PaperTrail.Domain`: entidades e validações do domínio.
-- `PaperTrail.Application`: DTOs, contratos de repositórios e serviços.
-- `PaperTrail.Infrastructure`: EF Core, mapeamentos Oracle, repositórios e cliente HTTP do catálogo.
-- `PaperTrail.API`: Minimal APIs, autenticação, Swagger e registro das dependências.
-- `PaperTrail.Domain.Tests` e `PaperTrail.API.Tests`: testes de domínio e integração HTTP.
+## Aplicação publicada
 
-## Executar
+- Swagger .NET: <https://papertrail-dotnet-rm561584.azurewebsites.net/swagger>
+- Swagger Java: <https://papertrail-java-rm561584.azurewebsites.net/swagger-ui/index.html>
 
-Use o SDK .NET 10. Confira a versão com `dotnet --version`.
-Se ele estiver instalado em `$HOME/.dotnet`, ajuste o PATH no Git Bash:
+Para testar a aplicação publicada, faça o cadastro e o login pelo Swagger Java. Depois, informe o token retornado no botão **Authorize** do Swagger .NET.
+
+As duas APIs publicadas usam o mesmo banco Azure SQL, com autenticação por identidade gerenciada. Para testar pelos links acima, basta criar uma conta na aplicação; não é necessário configurar um banco local. Os serviços e requisitos da carga inicial são fictícios.
+
+## Execução local
+
+O projeto usa .NET 10. Execute os comandos abaixo no Git Bash, dentro do repositório. Se o SDK estiver instalado em `$HOME/.dotnet`, inclua esse diretório no PATH:
 
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 dotnet --version
 ```
 
-As tabelas são instaladas pelo script `docs/database/papertrail.sql`. Se você já
-executou esse script para o Java na mesma conta Oracle, as tabelas já estão prontas.
-A aplicação não executa migrations nem cria ou exclui tabelas ao iniciar.
+### Banco de dados
 
-No terminal, dentro do repositório, configure a conexão sem gravar a senha no código:
+O caminho principal usa SQL Server. Prepare um banco próprio e execute [scripts/script-bd.sql](scripts/script-bd.sql) uma vez, em um banco vazio. Se o Java já usa esse banco, utilize a instalação existente. As duas APIs precisam consultar a mesma base.
 
-```bash
-read -r -s -p "Oracle connection string: " ConnectionStrings__PaperTrailOracle
-export ConnectionStrings__PaperTrailOracle
+O Azure SQL publicado usa identidade gerenciada do App Service, que não está disponível na máquina local. O acesso direto a esse banco exige uma identidade autorizada e a liberação da conexão. As credenciais do banco não são necessárias para usar as APIs publicadas.
+
+Para um SQL Server próprio com usuário e senha, use este formato:
+
+```text
+Server=tcp:seu_servidor,1433;Database=papertrail;User Id=seu_usuario;Password=sua_senha;Encrypt=True;TrustServerCertificate=False
 ```
 
-Formato da conexão:
+Selecione SQL Server e informe a conexão:
+
+```bash
+export Database__Provider=SqlServer
+read -r -s -p "SQL Server connection string: " ConnectionStrings__PaperTrailSqlServer
+export ConnectionStrings__PaperTrailSqlServer
+```
+
+<details>
+<summary>Alternativa: executar com Oracle da FIAP</summary>
+
+Quem tem uma conta válida na FIAP e não dispõe de um SQL Server próprio pode usar o Oracle. Execute [docs/database/papertrail.sql](docs/database/papertrail.sql) no SQL Developer com F5, uma vez por schema. Se o Java já usa as tabelas dessa conta, mantenha a instalação existente e configure as duas APIs para Oracle.
+
+Use este formato para a conexão:
 
 ```text
 User Id=seu_usuario;Password=sua_senha;Data Source=//oracle.fiap.com.br:1521/ORCL
 ```
 
-Configure o caminho do arquivo de chave pública usado pelo Java. Com os repositórios
-nas pastas `java/PaperTrail` e `dotnet/PaperTrail`, e o par RSA em `.local` no Java:
+No lugar da configuração SQL Server, use:
+
+```bash
+export Database__Provider=Oracle
+read -r -s -p "Oracle connection string: " ConnectionStrings__PaperTrailOracle
+export ConnectionStrings__PaperTrailOracle
+```
+
+A configuração sem seleção explícita de provedor mantém o Oracle como padrão. Os comandos do caminho principal selecionam SQL Server.
+
+</details>
+
+### Autenticação e inicialização
+
+Inicie a API Java com as chaves RSA configuradas. O arquivo `.local/public.pem` precisa corresponder à chave privada usada pelo Java. O .NET recebe somente a chave pública, e o caminho não usa o prefixo `file:`.
+
+Com o banco configurado, informe o caminho da chave pública e inicie a API .NET:
 
 ```bash
 export Jwt__PublicKeyPath="$(cd ../../java/PaperTrail && pwd -W)/.local/public.pem"
@@ -47,36 +77,25 @@ export JavaCatalog__BaseUrl="http://localhost:8080/"
 dotnet run --project PaperTrail.API
 ```
 
-A .NET recebe somente a chave pública correspondente ao par configurado no Java.
-`Jwt__PublicKeyPath` é um caminho de arquivo, sem o prefixo `file:`.
+O Swagger local fica em <http://localhost:5180/swagger>. Mantenha o Java em execução para criar preparativos, pois o .NET consulta o catálogo durante essa operação.
 
-O Swagger fica em `http://localhost:5180/swagger`. Obtenha um token em
-`POST /auth/login` no Java e informe seu valor no botão **Authorize**.
+## Uso da API
 
-## Endpoints disponíveis
+Todas as rotas de preparativos exigem autenticação. O acesso é restrito ao proprietário: uma tentativa de acessar o recurso de outro usuário retorna 404, inclusive para contas de gestor.
 
 | Método | Rota | Uso |
 | --- | --- | --- |
-| GET | `/preparativos?page=1&pageSize=20` | Listar os preparativos do usuário autenticado |
-| GET | `/preparativos/{id}` | Consultar um preparativo do usuário autenticado |
-| POST | `/preparativos` | Criar um preparativo com os itens do catálogo Java |
-| PUT | `/preparativos/{id}` | Alterar o título de um preparativo |
-| DELETE | `/preparativos/{id}` | Excluir um preparativo e seus itens |
+| GET | `/preparativos` | Lista os preparativos do usuário |
+| GET | `/preparativos/{id}` | Consulta um preparativo |
+| POST | `/preparativos` | Cria um preparativo com os requisitos do Java |
+| PUT | `/preparativos/{id}` | Altera o título |
+| DELETE | `/preparativos/{id}` | Exclui o preparativo e seus itens |
 
-A paginação começa em 1 e aceita até 100 registros por página.
-As rotas exigem o papel `CITIZEN` ou `MANAGER`. O proprietário vem do `sub` do JWT;
-um gestor também consulta apenas os próprios preparativos. Recursos de outro usuário
-retornam o mesmo 404 de um recurso inexistente.
+A listagem aceita `page` e `pageSize`, com até 100 registros por página. A primeira página é 1.
 
-Os tokens precisam usar RS256, emissor `papertrail`, audiência `papertrail-api`,
-expiração válida, `sub` com o ID positivo do usuário e a lista `roles`.
+### Criação
 
-A carga de demonstração do banco usa proprietários fictícios. Um usuário recém-criado
-no Java recebe uma lista vazia até criar seus preparativos.
-
-## Criar um preparativo
-
-Envie o token Java, uma chave de idempotência e o serviço desejado:
+Informe o serviço e o título no corpo da requisição. O cabeçalho `Idempotency-Key` identifica a tentativa de criação e permite repeti-la sem gerar outro preparativo:
 
 ```http
 POST /preparativos
@@ -87,89 +106,47 @@ Content-Type: application/json
 {"serviceId":1,"title":"Meu atendimento"}
 ```
 
-O proprietário vem do JWT. A versão e os itens vêm do snapshot do Java, incluindo
-os requisitos opcionais. Todos os itens começam sem conclusão. O retorno é 201,
-com o cabeçalho `Location` apontando para o preparativo criado.
+O .NET identifica o proprietário pelo token e consulta os requisitos e a versão no Java. Todos os itens começam pendentes. A criação retorna 201, com o cabeçalho `Location` apontando para o preparativo criado.
 
-`Idempotency-Key` é obrigatório: um valor de 1 a 128 caracteres ASCII visíveis,
-sem espaços ou vírgulas. A chave vale para o usuário e a operação de criação.
-Repetir a mesma chave e os mesmos valores devolve o status, o corpo e o `Location`
-originais, sem consultar o Java novamente. O título é comparado após remover
-espaços nas pontas. Alterar o título ou `serviceId` usando a mesma chave retorna 409.
+A chave aceita de 1 a 128 caracteres ASCII visíveis, sem espaços ou vírgulas. Se uma requisição for repetida com a mesma chave e o mesmo conteúdo, a API devolve a resposta original. Reutilizar a chave com outro conteúdo retorna 409.
 
-O snapshot é consultado antes da transação de escrita. Preparativo, itens e resposta
-idempotente são gravados juntos. Se a criação falhar, a transação é revertida e a
-chave pode ser usada em uma nova tentativa. Requisições concorrentes com a mesma
-chave mantêm uma única criação confirmada no banco.
+### Edição e exclusão
 
-## Editar e excluir um preparativo
+Para alterar o título, envie `{"title":"Novo título"}` na rota de edição. O limite é de 160 caracteres, e títulos vazios ou compostos apenas por espaços não são aceitos.
 
-Para alterar o título, envie `PUT /preparativos/{id}` com o token e o corpo:
+A exclusão retorna 204 e remove o preparativo e seus itens. A auditoria e a chave de criação permanecem no banco. Por isso, repetir o POST original depois de excluir o recurso devolve a resposta antiga, sem recriá-lo. Use outra chave para uma nova criação.
 
-```json
-{"title":"Documentos para meu atendimento"}
+## Estrutura e integração
+
+O código está dividido em Domain, Application, Infrastructure e API. Para obter os requisitos de um serviço, o .NET chama `GET /services/{id}/requirements-snapshot` no Java e encaminha o token recebido do usuário.
+
+```mermaid
+flowchart LR
+    client["Mobile ou Swagger"] -->|Cadastro, login e catálogo| java["API Java"]
+    client -->|JWT e preparativos| net["API .NET"]
+    net -->|Snapshot com JWT| java
+    subgraph plan["App Service Plan compartilhado"]
+        java
+        net
+    end
+    java -->|Identidade gerenciada| db["Azure SQL"]
+    net -->|Identidade gerenciada| db
 ```
 
-O título aceita de 1 a 160 caracteres após remover espaços nas pontas. A resposta
-é 200 com o preparativo atualizado. Serviço, versão, proprietário e itens são
-mantidos.
+No ambiente publicado, as chamadas entre as APIs usam HTTPS. O Java assina os tokens com RSA, e o .NET verifica a assinatura usando a chave pública correspondente.
 
-`DELETE /preparativos/{id}` retorna 204 e remove o preparativo com seus itens na
-mesma transação. A trilha de auditoria permanece, incluindo as exclusões dos itens.
-Outro usuário recebe 404 nas duas operações, inclusive se tiver o papel `MANAGER`.
+### Banco e publicação
 
-A resposta de criação guardada pela chave de idempotência permanece após uma
-edição ou exclusão. Repetir o POST com a chave original devolve aquela resposta,
-sem recriar o preparativo excluído. Use uma nova chave para criar outro preparativo.
-
-## Integração com Java
-
-`IJavaCatalogClient` consulta `GET /services/{id}/requirements-snapshot`, encaminhando
-o token da requisição. O retorno inclui serviço, versão e requisitos com IDs estáveis.
-O cliente valida os campos recebidos e rejeita respostas incompletas ou inconsistentes.
-
-O contexto `PaperTrailContext` mapeia `PT_PREPARATION`, `PT_PREPARATION_ITEM` e
-`PT_SERVICE_VERSION`. Os identificadores do catálogo são referências externas.
-`IPreparationRepository` faz consultas por ID e proprietário; `IServiceVersionRepository`
-consulta a versão conhecida de cada serviço.
+O banco de deploy é instalado por [scripts/script-bd.sql](scripts/script-bd.sql). O script [scripts/provision-azure.sh](scripts/provision-azure.sh) cria os recursos na Azure. A aplicação não cria tabelas nem aplica migrations ao iniciar.
 
 ## Testes
+
+Para executar a suíte de testes:
 
 ```bash
 dotnet test PaperTrail.sln
 ```
 
-Os testes geram um par RSA temporário e usam persistência e respostas HTTP locais.
-Não precisam de senha Oracle, chave privada do Java ou serviços externos em execução.
-Os testes de mapeamento conferem a tradução SQL para Oracle; a execução no banco real
-é uma verificação separada.
-Os testes de criação usam SQLite temporário para conferir transações, concorrência,
-restrição de chave única e rollback da auditoria. A validação específica no Oracle
-é feita separadamente, em tabelas isoladas de teste.
+Os testes usam bancos temporários e chaves geradas durante a execução. A cobertura de persistência inclui criação, acesso por proprietário, idempotência e rollback. A validação no banco remoto é feita separadamente.
 
-## Integração contínua
-
-O arquivo `azure-pipeline.yml` define o build no Azure Pipelines. Ele instala o SDK
-.NET 10, restaura dependências, compila em Release, executa os testes e publica os
-resultados TRX. O pacote `PaperTrail.API.zip` fica no artefato `api` e só é gerado
-se as etapas anteriores passarem.
-
-No Azure DevOps, importe o repositório para o Azure Repos e crie um pipeline
-apontando para esse arquivo. Na criação, selecione a `develop` enquanto o YAML
-ainda não tiver chegado à `main` por PR. O gatilho automático acompanha somente a `main`.
-Proteja essa branch para receber alterações por PR, exigindo revisor, vínculo
-com Work Item e revisor padrão conforme o RM. Para conferir o pipeline antes do
-primeiro merge, execute-o manualmente na branch de trabalho.
-
-Os testes usam bancos locais temporários e chaves RSA geradas durante a execução.
-O pipeline de build não precisa das credenciais Oracle nem das chaves da aplicação.
-O deploy automático e o provisionamento Azure serão configurados após a definição
-da hospedagem e do banco de dados.
-
-## Próximas etapas
-
-Estão pendentes os endpoints de itens e progresso, rate limiting, health checks
-e o consumidor de eventos.
-
-Os arquivos de Database ficam em `docs/database`, com o mesmo conteúdo do repositório
-Java. O PDF ainda aguarda a consolidação final da disciplina.
+O pipeline [azure-pipeline.yml](azure-pipeline.yml) compila em Release, executa os testes e publica o ZIP da API. A ligação com o Azure Repos e o deploy automático ainda estão pendentes.
