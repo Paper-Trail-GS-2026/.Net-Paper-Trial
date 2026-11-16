@@ -1,3 +1,4 @@
+using PaperTrail.API.Configuration.TrafficPolicies;
 using PaperTrail.API.Endpoints;
 using PaperTrail.API.Endpoints.Checklist;
 using PaperTrail.API.Exceptions;
@@ -15,6 +16,8 @@ public partial class Program
         builder.Services.AddPaperTrailApplicationServices();
         builder.Services.AddPaperTrailChecklist();
         builder.Services.AddPaperTrailCatalogClient();
+        builder.Services.AddPaperTrailHealth();
+        builder.Services.AddPaperTrailRateLimiting();
         builder.Services.AddPaperTrailAuthentication();
         builder.Services.AddPaperTrailSwagger();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -36,7 +39,9 @@ public partial class Program
 
         app.UseHttpsRedirection();
         app.UseAuthentication();
+        app.UseRateLimiter();
         app.UseAuthorization();
+        app.MapPaperTrailHealth();
         app.MapPreparationEndpoints();
         app.MapChecklistEndpoints();
         app.Run();
