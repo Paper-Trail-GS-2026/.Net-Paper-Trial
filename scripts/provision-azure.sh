@@ -19,6 +19,12 @@ plan_name="${AZURE_PLAN_NAME:-asp-papertrail-rm561584}"
 sql_server="${AZURE_SQL_SERVER:-papertrail-sql-rm561584}"
 java_app="${AZURE_JAVA_APP:-papertrail-java-rm561584}"
 dotnet_app="${AZURE_DOTNET_APP:-papertrail-dotnet-rm561584}"
+pipeline_identity="${AZURE_PIPELINE_IDENTITY:-id-papertrail-pipelines-rm561584}"
+
+if [[ -n "${PIPELINE_FEDERATION_ISSUER:-}" || -n "${PIPELINE_FEDERATION_SUBJECT:-}" ]]; then
+    : "${PIPELINE_FEDERATION_ISSUER:?Configure the service connection issuer.}"
+    : "${PIPELINE_FEDERATION_SUBJECT:?Configure the service connection subject.}"
+fi
 
 admin_id="${AZURE_ADMIN_OBJECT_ID:-$(az ad signed-in-user show --query id -o tsv | tr -d '\r')}"
 admin_name="${AZURE_ADMIN_NAME:-$(az account show --query user.name -o tsv | tr -d '\r')}"
@@ -69,6 +75,15 @@ JSON
         index=$((index + 1))
     done
 done
+
+printf 'Creating pipeline identity...\n'
+az identity create --subscription "$subscription_id" --resource-group "$resource_group" --name "$pipeline_identity" --location "$location" --output none
+principal_id="$(az identity show --subscription "$subscription_id" --resource-group "$resource_group" --name "$pipeline_identity" --query principalId -o tsv | tr -d '\r')"
+az role assignment create --subscription "$subscription_id" --assignee-object-id "$principal_id" --assignee-principal-type ServicePrincipal --role 'Website Contributor' --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group" --output none
+
+if [[ -n "${PIPELINE_FEDERATION_ISSUER:-}" ]]; then
+    az identity federated-credential create --subscription "$subscription_id" --resource-group "$resource_group" --identity-name "$pipeline_identity" --name papertrail-azure --issuer "$PIPELINE_FEDERATION_ISSUER" --subject "$PIPELINE_FEDERATION_SUBJECT" --audiences api://AzureADTokenExchange --output none
+fi
 
 printf 'Resource group: %s\nSQL server: %s.database.windows.net\n' "$resource_group" "$sql_server"
 for app in "$java_app" "$dotnet_app"; do

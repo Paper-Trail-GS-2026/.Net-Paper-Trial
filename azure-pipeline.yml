@@ -11,50 +11,83 @@ pool:
 
 variables:
   buildConfiguration: Release
+  azureServiceConnection: papertrail-azure
+  webAppName: papertrail-dotnet-rm561584
 
-steps:
-  - checkout: self
-    clean: true
+stages:
+  - stage: CI
+    displayName: Build and test
+    jobs:
+      - job: Build
+        steps:
+          - checkout: self
+            clean: true
 
-  - task: UseDotNet@2
-    displayName: Install .NET SDK
-    inputs:
-      packageType: sdk
-      version: 10.0.x
+          - task: UseDotNet@2
+            displayName: Install .NET SDK
+            inputs:
+              packageType: sdk
+              version: 10.0.x
 
-  - script: dotnet restore PaperTrail.sln
-    displayName: Restore dependencies
+          - script: dotnet restore PaperTrail.sln
+            displayName: Restore dependencies
 
-  - script: dotnet build PaperTrail.sln --configuration $(buildConfiguration) --no-restore
-    displayName: Build solution
+          - script: dotnet build PaperTrail.sln --configuration $(buildConfiguration) --no-restore
+            displayName: Build solution
 
-  - script: dotnet test PaperTrail.sln --configuration $(buildConfiguration) --no-build --no-restore --logger trx --results-directory "$(Agent.TempDirectory)/test-results"
-    displayName: Run tests
+          - script: dotnet test PaperTrail.sln --configuration $(buildConfiguration) --no-build --no-restore --logger trx --results-directory "$(Agent.TempDirectory)/test-results"
+            displayName: Run tests
 
-  - task: PublishTestResults@2
-    displayName: Publish test results
-    condition: succeededOrFailed()
-    inputs:
-      testResultsFormat: VSTest
-      testResultsFiles: '**/*.trx'
-      searchFolder: $(Agent.TempDirectory)/test-results
-      failTaskOnFailedTests: true
-      failTaskOnMissingResultsFile: true
-      testRunTitle: PaperTrail .NET
+          - task: PublishTestResults@2
+            displayName: Publish test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '**/*.trx'
+              searchFolder: $(Agent.TempDirectory)/test-results
+              failTaskOnFailedTests: true
+              failTaskOnMissingResultsFile: true
+              testRunTitle: PaperTrail .NET
 
-  - script: dotnet publish PaperTrail.API/PaperTrail.API.csproj --configuration $(buildConfiguration) --no-build --no-restore --property:UseAppHost=false --output "$(Build.BinariesDirectory)/publish"
-    displayName: Publish API
+          - script: dotnet publish PaperTrail.API/PaperTrail.API.csproj --configuration $(buildConfiguration) --no-build --no-restore --property:UseAppHost=false --output "$(Build.BinariesDirectory)/publish"
+            displayName: Publish API
 
-  - task: ArchiveFiles@2
-    displayName: Package API
-    inputs:
-      rootFolderOrFile: $(Build.BinariesDirectory)/publish
-      includeRootFolder: false
-      archiveType: zip
-      archiveFile: $(Build.ArtifactStagingDirectory)/PaperTrail.API.zip
+          - task: ArchiveFiles@2
+            displayName: Package API
+            inputs:
+              rootFolderOrFile: $(Build.BinariesDirectory)/publish
+              includeRootFolder: false
+              archiveType: zip
+              archiveFile: $(Build.ArtifactStagingDirectory)/PaperTrail.API.zip
 
-  - task: PublishPipelineArtifact@1
-    displayName: Publish API artifact
-    inputs:
-      targetPath: $(Build.ArtifactStagingDirectory)/PaperTrail.API.zip
-      artifact: api
+          - task: PublishPipelineArtifact@1
+            displayName: Publish API artifact
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/PaperTrail.API.zip
+              artifact: api
+
+  - stage: Release
+    displayName: Deploy API
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: Deploy
+        steps:
+          - checkout: none
+
+          - download: current
+            artifact: api
+
+          - task: AzureWebApp@1
+            displayName: Deploy to App Service
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              appType: webAppLinux
+              appName: $(webAppName)
+              package: $(Pipeline.Workspace)/api/PaperTrail.API.zip
+              startUpCommand: bash /home/site/wwwroot/startup.sh
+
+          - bash: |
+              curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors --max-time 20 \
+                "https://$(webAppName).azurewebsites.net/swagger/v1/swagger.json" --output /dev/null
+            displayName: Check published API

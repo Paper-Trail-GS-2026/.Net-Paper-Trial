@@ -149,4 +149,10 @@ dotnet test PaperTrail.sln
 
 Os testes usam bancos temporários e chaves geradas durante a execução. A cobertura de persistência inclui criação, acesso por proprietário, idempotência e rollback. A validação no banco remoto é feita separadamente.
 
-O pipeline [azure-pipeline.yml](azure-pipeline.yml) compila em Release, executa os testes e publica o ZIP da API. A ligação com o Azure Repos e o deploy automático ainda estão pendentes.
+## CI e publicação
+
+O arquivo [azure-pipeline.yml](azure-pipeline.yml) define as etapas de CI e Release. O merge por PR na `main` aciona o build em Release, os testes e a geração do ZIP. A Release baixa esse mesmo artefato, publica no App Service e verifica a resposta da API.
+
+A conexão `papertrail-azure` usa identidade federada. As chaves RSA e a configuração do banco permanecem no App Service. O script de provisionamento também cria a identidade dos pipelines; `PIPELINE_FEDERATION_ISSUER` e `PIPELINE_FEDERATION_SUBJECT` recebem os valores fornecidos pela conexão do Azure DevOps para configurar a federação.
+
+Os pipelines ficam em <https://dev.azure.com/RM561584/PaperTrail-GS-2026-2/_build>.
