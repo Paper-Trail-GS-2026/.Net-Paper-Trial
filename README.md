@@ -120,18 +120,7 @@ A exclusão retorna 204 e remove o preparativo e seus itens. A auditoria e a cha
 
 O código está dividido em Domain, Application, Infrastructure e API. Para obter os requisitos de um serviço, o .NET chama `GET /services/{id}/requirements-snapshot` no Java e encaminha o token recebido do usuário.
 
-```mermaid
-flowchart LR
-    client["Mobile ou Swagger"] -->|Cadastro, login e catálogo| java["API Java"]
-    client -->|JWT e preparativos| net["API .NET"]
-    net -->|Snapshot com JWT| java
-    subgraph plan["App Service Plan compartilhado"]
-        java
-        net
-    end
-    java -->|Identidade gerenciada| db["Azure SQL"]
-    net -->|Identidade gerenciada| db
-```
+![Arquitetura do PaperTrail: Azure Boards e Repos, CI/CD, APIs Java e .NET e Azure SQL](docs/devops/arquitetura.svg)
 
 No ambiente publicado, as chamadas entre as APIs usam HTTPS. O Java assina os tokens com RSA, e o .NET verifica a assinatura usando a chave pública correspondente.
 
@@ -156,3 +145,5 @@ O arquivo [azure-pipeline.yml](azure-pipeline.yml) define as etapas de CI e Rele
 A conexão `papertrail-azure` usa identidade federada. As chaves RSA e a configuração do banco permanecem no App Service. O script de provisionamento também cria a identidade dos pipelines; `PIPELINE_FEDERATION_ISSUER` e `PIPELINE_FEDERATION_SUBJECT` recebem os valores fornecidos pela conexão do Azure DevOps para configurar a federação.
 
 Os pipelines ficam em <https://dev.azure.com/RM561584/PaperTrail-GS-2026-2/_build>.
+
+A identificação do grupo, os acessos e as evidências de publicação estão em [docs/devops/PaperTrail_rm561584.pdf](docs/devops/PaperTrail_rm561584.pdf). O material distingue a versão publicada das alterações em revisão.

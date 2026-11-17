@@ -1,0 +1,18 @@
+PaperTrail - Global Solution 2026/2
+Turma: 2TDSPG
+
+RM565592 - André Emygdio Ferreira
+RM562194 - Gabriel Lourenço Martins
+RM561336 - Giovane Amato dos Santos
+RM561959 - Matheus Roque Arantes
+RM561584 - Orlando Gonçalves de Arruda
+
+Representante: RM561584 - Orlando Gonçalves de Arruda
+Professor: Antonio Sergio Rodrigues Figueiredo
+
+Organização Azure DevOps: https://dev.azure.com/RM561584
+Projeto Azure DevOps: https://dev.azure.com/RM561584/PaperTrail-GS-2026-2
+GitHub Java: https://github.com/Paper-Trail-GS-2026/Java-Advanced-Paper-Trial
+GitHub .NET: https://github.com/Paper-Trail-GS-2026/.Net-Paper-Trial
+
+Vídeo no YouTube: a incluir após a gravação.
