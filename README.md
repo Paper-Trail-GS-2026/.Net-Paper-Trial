@@ -90,6 +90,13 @@ Todas as rotas de preparativos exigem autenticação. O acesso é restrito ao pr
 | POST | `/preparativos` | Cria um preparativo com os requisitos do Java |
 | PUT | `/preparativos/{id}` | Altera o título |
 | DELETE | `/preparativos/{id}` | Exclui o preparativo e seus itens |
+| GET | `/preparativos/{preparationId}/itens` | Lista os itens |
+| GET | `/preparativos/{preparationId}/itens/{itemId}` | Consulta um item |
+| POST | `/preparativos/{preparationId}/itens` | Adiciona um item pessoal |
+| PUT | `/preparativos/{preparationId}/itens/{itemId}` | Altera o título e a obrigatoriedade do item |
+| PATCH | `/preparativos/{preparationId}/itens/{itemId}/estado` | Conclui ou reabre o item |
+| DELETE | `/preparativos/{preparationId}/itens/{itemId}` | Exclui o item |
+| GET | `/preparativos/{preparationId}/progresso` | Consulta progresso e pendências |
 
 A listagem aceita `page` e `pageSize`, com até 100 registros por página. A primeira página é 1.
 
@@ -115,6 +122,20 @@ A chave aceita de 1 a 128 caracteres ASCII visíveis, sem espaços ou vírgulas.
 Para alterar o título, envie `{"title":"Novo título"}` na rota de edição. O limite é de 160 caracteres, e títulos vazios ou compostos apenas por espaços não são aceitos.
 
 A exclusão retorna 204 e remove o preparativo e seus itens. A auditoria e a chave de criação permanecem no banco. Por isso, repetir o POST original depois de excluir o recurso devolve a resposta antiga, sem recriá-lo. Use outra chave para uma nova criação.
+
+### Itens e progresso
+
+Para adicionar ou editar um item, envie `{"title":"Conferir documento","required":true}`. O título aceita até 200 caracteres. Um item pessoal não recebe vínculo com um requisito do catálogo, e a edição preserva seu estado de conclusão.
+
+Na rota de estado, envie `{"completed":true}` para concluir ou `{"completed":false}` para reabrir. A listagem de itens aceita `page`, `pageSize` e `pending=true`; esse filtro retorna somente os obrigatórios não concluídos.
+
+O progresso considera apenas os itens obrigatórios. Quando todos estão concluídos, `ready=true`; preparativos vazios ou sem obrigatórios ficam com 0% e `ready=false`. O campo `sourceOutdated` compara a versão de origem com a última versão conhecida do serviço.
+
+### Limite de requisições e health check
+
+O limite padrão é de 100 requisições por usuário a cada 60 segundos. Ao exceder, a API retorna 429 e o cabeçalho `Retry-After` indica a espera. Requisições sem usuário válido são agrupadas pelo IP recebido pela aplicação.
+
+`GET /health` é público e fica fora desse limite. O retorno apresenta somente os estados do banco e do catálogo Java: `Healthy` quando ambos respondem, `Degraded` quando apenas o catálogo está indisponível e `Unhealthy`, com HTTP 503, quando o banco está indisponível.
 
 ## Estrutura e integração
 
@@ -147,3 +168,5 @@ A conexão `papertrail-azure` usa identidade federada. As chaves RSA e a configu
 Os pipelines ficam em <https://dev.azure.com/RM561584/PaperTrail-GS-2026-2/_build>.
 
 A identificação do grupo, os acessos e as evidências de publicação estão em [docs/devops/PaperTrail_rm561584.pdf](docs/devops/PaperTrail_rm561584.pdf). O material distingue a versão publicada das alterações em revisão.
+
+O passo a passo da demonstração de DevOps está em [docs/devops/ROTEIRO-VIDEO-DEVOPS-ANDRE.md](docs/devops/ROTEIRO-VIDEO-DEVOPS-ANDRE.md).

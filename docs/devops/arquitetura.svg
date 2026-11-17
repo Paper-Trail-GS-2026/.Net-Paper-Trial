@@ -91,7 +91,7 @@
 			<text x="105" y="48" style="font-family: Helvetica; font-size: 13px;fill: rgb(14%,38%,65%); stroke:none;" transform="translate(0,96) scale(1,-1)">Azul: CI/CD</text>
 			<text x="282" y="48" style="font-family: Helvetica; font-size: 13px;fill: rgb(8%,47%,39%); stroke:none;" transform="translate(0,96) scale(1,-1)">Verde: aplicação e persistência</text>
 			<text x="588" y="48" style="font-family: Helvetica; font-size: 13px;fill: rgb(43%,25%,63%); stroke:none;" transform="translate(0,96) scale(1,-1)">Roxo: rastreabilidade</text>
-			<text x="20" y="21" style="font-family: Helvetica; font-size: 12px;fill: rgb(32%,38%,46%); stroke:none;" transform="translate(0,42) scale(1,-1)">Oracle e MongoDB: entrega acadêmica separada. RabbitMQ: integração em conclusão, fora do deploy conferido.</text>
+			<text x="20" y="21" style="font-family: Helvetica; font-size: 12px;fill: rgb(32%,38%,46%); stroke:none;" transform="translate(0,42) scale(1,-1)">Persistência da aplicação em Azure SQL. O CI/CD usa autenticação por identidade federada.</text>
 		</g>
 	</g>
 </svg>
