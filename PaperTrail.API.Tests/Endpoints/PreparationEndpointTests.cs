@@ -130,7 +130,8 @@ public sealed class PreparationEndpointTests(PaperTrailApiFactory factory) : ICl
         Assert.Equal("bearer", json.RootElement.GetProperty("components").GetProperty("securitySchemes")
             .GetProperty("Bearer").GetProperty("scheme").GetString());
         var endpoints = json.RootElement.GetProperty("paths").EnumerateObject().ToList();
-        Assert.Equal(2, endpoints.Count);
-        Assert.All(endpoints, endpoint => Assert.True(endpoint.Value.GetProperty("get").GetProperty("security").GetArrayLength() > 0));
+        Assert.Equal(6, endpoints.Count);
+        Assert.All(endpoints, endpoint => Assert.All(endpoint.Value.EnumerateObject(),
+            operation => Assert.True(operation.Value.GetProperty("security").GetArrayLength() > 0)));
     }
 }
