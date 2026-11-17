@@ -168,5 +168,3 @@ A conexão `papertrail-azure` usa identidade federada. As chaves RSA e a configu
 Os pipelines ficam em <https://dev.azure.com/RM561584/PaperTrail-GS-2026-2/_build>.
 
 A identificação do grupo, os acessos e as evidências de publicação estão em [docs/devops/PaperTrail_rm561584.pdf](docs/devops/PaperTrail_rm561584.pdf). O material distingue a versão publicada das alterações em revisão.
-
-O passo a passo da demonstração de DevOps está em [docs/devops/ROTEIRO-VIDEO-DEVOPS-ANDRE.md](docs/devops/ROTEIRO-VIDEO-DEVOPS-ANDRE.md).
