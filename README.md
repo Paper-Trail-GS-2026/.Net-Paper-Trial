@@ -135,7 +135,7 @@ O progresso considera apenas os itens obrigatórios. Quando todos estão conclu�
 
 O limite padrão é de 100 requisições por usuário a cada 60 segundos. Ao exceder, a API retorna 429 e o cabeçalho `Retry-After` indica a espera. Requisições sem usuário válido são agrupadas pelo IP recebido pela aplicação.
 
-`GET /health` é público e fica fora desse limite. O retorno apresenta somente os estados do banco e do catálogo Java: `Healthy` quando ambos respondem, `Degraded` quando apenas o catálogo está indisponível e `Unhealthy`, com HTTP 503, quando o banco está indisponível.
+`GET /health` é público e fica fora desse limite. O retorno apresenta somente os estados das dependências: `Healthy` quando as dependências habilitadas funcionam, `Degraded` quando o catálogo ou o consumidor de eventos está indisponível e `Unhealthy`, com HTTP 503, quando o banco está indisponível.
 
 ## Estrutura e integração
 
@@ -164,6 +164,8 @@ A mensagem é confirmada após a persistência. Falhas no banco devolvem a mensa
 ### Banco e publicação
 
 O banco de deploy é instalado por [scripts/script-bd.sql](scripts/script-bd.sql). O script [scripts/provision-azure.sh](scripts/provision-azure.sh) cria os recursos na Azure. A aplicação não cria tabelas nem aplica migrations ao iniciar.
+
+O RabbitMQ usa uma VM com volume persistente e acesso privado pelas APIs. O provisionamento de rede e VM está em [scripts/provision-rabbitmq.sh](scripts/provision-rabbitmq.sh); [scripts/install-rabbitmq.sh](scripts/install-rabbitmq.sh) instala o broker e gera suas credenciais no servidor. A interface de administração não é exposta publicamente.
 
 ## Testes
 
@@ -203,4 +205,4 @@ A conexão `papertrail-azure` usa identidade federada. As chaves RSA e a configu
 
 Os pipelines ficam em <https://dev.azure.com/RM561584/PaperTrail-GS-2026-2/_build>.
 
-A identificação do grupo, os acessos e as evidências de publicação estão em [docs/devops/PaperTrail_rm561584.pdf](docs/devops/PaperTrail_rm561584.pdf). O material distingue a versão publicada das alterações em revisão.
+A identificação do grupo, os acessos e as evidências de publicação estão em [docs/devops/PaperTrail_rm561584.pdf](docs/devops/PaperTrail_rm561584.pdf).
