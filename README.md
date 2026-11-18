@@ -145,6 +145,22 @@ O código está dividido em Domain, Application, Infrastructure e API. Para obte
 
 No ambiente publicado, as chamadas entre as APIs usam HTTPS. O Java assina os tokens com RSA, e o .NET verifica a assinatura usando a chave pública correspondente.
 
+### Eventos do catálogo
+
+O consumidor RabbitMQ recebe do Java os campos `eventId`, `serviceId`, `version` e `occurredAt`. Ele mantém a maior versão em `PT_SERVICE_VERSION`, sem alterar preparativos ou itens existentes. Quando essa versão supera a origem do preparativo, o progresso retorna `sourceOutdated=true`.
+
+O consumo fica desativado por padrão. Para habilitar, configure o mesmo broker nas duas APIs. No .NET, use:
+
+```bash
+export CatalogEvents__Enabled=true
+read -r -s -p "AMQP URI: " CatalogEvents__Uri
+export CatalogEvents__Uri
+```
+
+A URI aceita `amqp://` ou `amqps://`. Os nomes padrão são exchange `papertrail.catalog`, routing key `catalog.service.updated` e fila `papertrail.dotnet.catalog-version`, iguais aos do Java. Podem ser ajustados em `CatalogEvents__Exchange`, `CatalogEvents__RoutingKey` e `CatalogEvents__Queue`.
+
+A mensagem é confirmada após a persistência. Falhas no banco devolvem a mensagem à fila; mensagens inválidas são rejeitadas e registradas no log. A reconexão é tentada a cada cinco segundos. Com o consumo habilitado, `/health` inclui `catalogEvents`, que fica `Degraded` enquanto o consumidor estiver desconectado.
+
 ### Banco e publicação
 
 O banco de deploy é instalado por [scripts/script-bd.sql](scripts/script-bd.sql). O script [scripts/provision-azure.sh](scripts/provision-azure.sh) cria os recursos na Azure. A aplicação não cria tabelas nem aplica migrations ao iniciar.
@@ -158,6 +174,26 @@ dotnet test PaperTrail.sln
 ```
 
 Os testes usam bancos temporários e chaves geradas durante a execução. A cobertura de persistência inclui criação, acesso por proprietário, idempotência e rollback. A validação no banco remoto é feita separadamente.
+
+Os testes de mensagens, concorrência e preservação dos itens rodam nessa suíte. Para executar também os testes com RabbitMQ real, inicie um broker local com management:
+
+```bash
+docker run --detach --name papertrail-rabbitmq-test \
+  --publish 127.0.0.1:5679:5672 --publish 127.0.0.1:15679:15672 rabbitmq:4.2-management
+```
+
+Aguarde `docker exec papertrail-rabbitmq-test rabbitmq-diagnostics -q ping` responder com sucesso. Depois execute:
+
+```bash
+PAPERTRAIL_RABBITMQ_TEST_URI='amqp://guest:guest@127.0.0.1:5679/' \
+PAPERTRAIL_RABBITMQ_TEST_MANAGEMENT_URI='http://127.0.0.1:15679/' \
+dotnet test PaperTrail.API.Tests --filter 'FullyQualifiedName~CatalogEvent'
+
+docker stop papertrail-rabbitmq-test
+docker rm papertrail-rabbitmq-test
+```
+
+Esses testes usam filas exclusivas de teste e verificam redelivery, reconexão e o efeito no progresso. Sem as variáveis, os dois testes com broker são ignorados; os demais continuam rodando no CI.
 
 ## CI e publicação
 
