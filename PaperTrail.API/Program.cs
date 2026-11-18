@@ -17,6 +17,7 @@ public partial class Program
         builder.Services.AddPaperTrailChecklist();
         builder.Services.AddPaperTrailCatalogClient();
         builder.Services.AddPaperTrailHealth();
+        builder.Services.AddPaperTrailCatalogEvents(builder.Configuration);
         builder.Services.AddPaperTrailRateLimiting();
         builder.Services.AddPaperTrailAuthentication();
         builder.Services.AddPaperTrailSwagger();
