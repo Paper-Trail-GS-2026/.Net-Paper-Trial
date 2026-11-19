@@ -59,7 +59,11 @@ for app in "$java_app" "$dotnet_app"; do
       "linuxFxVersion": "$runtime",
       "appCommandLine": "bash /home/site/wwwroot/startup.sh",
       "alwaysOn": true,
-      "ftpsState": "Disabled"
+      "ftpsState": "Disabled",
+      "cors": {
+        "allowedOrigins": ["http://localhost:8081", "http://127.0.0.1:8081"],
+        "supportCredentials": false
+      }
     }
   }
 }
