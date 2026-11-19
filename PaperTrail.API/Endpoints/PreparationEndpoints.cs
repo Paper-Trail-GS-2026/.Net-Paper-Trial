@@ -16,7 +16,7 @@ public static class PreparationEndpoints
         var group = endpoints.MapGroup("/preparativos").WithTags("Preparativos")
             .RequireAuthorization(PaperTrailAuthenticationExtensions.CitizenOrManager);
 
-        group.MapGet("/", GetPagedAsync).WithName("GetPreparations").WithSummary("List your preparations")
+        group.MapGet("/", GetPagedAsync).WithName("GetPreparations").WithSummary("List your preparations with authorized user")
             .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(503);
         group.MapGet("/{id:long}", GetByIdAsync).WithName("GetPreparation").WithSummary("Get one of your preparations")
             .ProducesProblem(400).ProducesProblem(401).ProducesProblem(403).ProducesProblem(404).ProducesProblem(503);
