@@ -1,0 +1,13 @@
+PaperTrail - Global Solution 2026/2
+Mastering Relational and Non-Relational Database
+Turma: 2TDSPG
+
+RM565592 - André Emygdio Ferreira
+RM562194 - Gabriel Lourenço Martins
+RM561336 - Giovane Amato dos Santos
+RM561959 - Matheus Roque Arantes
+RM561584 - Orlando Gonçalves de Arruda
+
+Representante: Orlando Gonçalves de Arruda - RM561584
+Java: https://github.com/Paper-Trail-GS-2026/Java-Advanced-Paper-Trial
+.NET: https://github.com/Paper-Trail-GS-2026/.Net-Paper-Trial
