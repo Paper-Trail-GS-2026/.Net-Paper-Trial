@@ -19,7 +19,7 @@ BEGIN
     SELECT COUNT(*) INTO v_objects FROM USER_OBJECTS
     WHERE SUBSTR(OBJECT_NAME, 1, 3) = 'PT_'
        OR SUBSTR(OBJECT_NAME, 1, 6) = 'IX_PT_'
-       OR OBJECT_NAME IN ('PKG_PREPARATION', 'TRG_PT_ITEM_AUDIT');
+       OR OBJECT_NAME IN ('PKG_PREPARATION', 'PKG_CHECKLIST', 'TRG_PT_ITEM_AUDIT', 'TRG_PT_ITEM_GUARD');
     SELECT COUNT(*) INTO v_constraints FROM USER_CONSTRAINTS
     WHERE SUBSTR(CONSTRAINT_NAME, 1, 6) IN ('PK_PT_', 'UQ_PT_', 'CK_PT_', 'FK_PT_');
     IF v_objects + v_constraints > 0 THEN
@@ -713,7 +713,229 @@ END;
 /
 ROLLBACK;
 
-PROMPT 10. Preparation progress
+PROMPT 10. PKG_CHECKLIST: specification and body
+
+CREATE OR REPLACE PACKAGE PKG_CHECKLIST AUTHID DEFINER AS
+    FUNCTION pending_required_count(
+        p_preparation_id IN PT_PREPARATION.ID%TYPE
+    ) RETURN NUMBER;
+
+    PROCEDURE set_item_state(
+        p_owner_subject IN PT_PREPARATION.OWNER_SUBJECT%TYPE,
+        p_preparation_id IN PT_PREPARATION.ID%TYPE,
+        p_item_id IN PT_PREPARATION_ITEM.ID%TYPE,
+        p_completed IN PT_PREPARATION_ITEM.COMPLETED%TYPE
+    );
+END PKG_CHECKLIST;
+/
+
+CREATE OR REPLACE PACKAGE BODY PKG_CHECKLIST AS
+    c_max_integer CONSTANT NUMBER := 999999999999999999;
+
+    FUNCTION pending_required_count(
+        p_preparation_id IN PT_PREPARATION.ID%TYPE
+    ) RETURN NUMBER IS
+        v_pending NUMBER;
+    BEGIN
+        IF p_preparation_id IS NULL OR p_preparation_id <= 0
+            OR p_preparation_id > c_max_integer OR p_preparation_id <> TRUNC(p_preparation_id) THEN
+            RAISE_APPLICATION_ERROR(-20002, 'Preparation ID must be a positive integer with at most 18 digits.');
+        END IF;
+
+        SELECT COUNT(CASE WHEN i.REQUIRED = 1 AND i.COMPLETED = 0 THEN 1 END)
+        INTO v_pending
+        FROM PT_PREPARATION p
+        LEFT JOIN PT_PREPARATION_ITEM i ON i.PREPARATION_ID = p.ID
+        WHERE p.ID = p_preparation_id
+        GROUP BY p.ID;
+        RETURN v_pending;
+    EXCEPTION WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Preparation not found.');
+    END pending_required_count;
+
+    PROCEDURE set_item_state(
+        p_owner_subject IN PT_PREPARATION.OWNER_SUBJECT%TYPE,
+        p_preparation_id IN PT_PREPARATION.ID%TYPE,
+        p_item_id IN PT_PREPARATION_ITEM.ID%TYPE,
+        p_completed IN PT_PREPARATION_ITEM.COMPLETED%TYPE
+    ) IS
+        v_owner PT_PREPARATION.OWNER_SUBJECT%TYPE;
+    BEGIN
+        IF p_preparation_id IS NULL OR p_preparation_id <= 0
+            OR p_preparation_id > c_max_integer OR p_preparation_id <> TRUNC(p_preparation_id) THEN
+            RAISE_APPLICATION_ERROR(-20002, 'Preparation ID must be a positive integer with at most 18 digits.');
+        END IF;
+        IF p_owner_subject IS NULL OR LENGTH(p_owner_subject) > 128
+            OR NOT REGEXP_LIKE(p_owner_subject, '[^[:space:]]') THEN
+            RAISE_APPLICATION_ERROR(-20004, 'Owner is required and must have at most 128 characters.');
+        END IF;
+        IF p_item_id IS NULL OR p_item_id <= 0 OR p_item_id > c_max_integer OR p_item_id <> TRUNC(p_item_id) THEN
+            RAISE_APPLICATION_ERROR(-20008, 'Item ID must be a positive integer with at most 18 digits.');
+        END IF;
+        IF p_completed IS NULL OR p_completed NOT IN (0, 1) THEN
+            RAISE_APPLICATION_ERROR(-20011, 'Completed must be 0 or 1.');
+        END IF;
+
+        SELECT OWNER_SUBJECT INTO v_owner FROM PT_PREPARATION
+        WHERE ID = p_preparation_id FOR UPDATE;
+        IF v_owner <> p_owner_subject THEN
+            RAISE_APPLICATION_ERROR(-20009, 'The preparation belongs to another owner.');
+        END IF;
+
+        UPDATE PT_PREPARATION_ITEM SET COMPLETED = p_completed
+        WHERE ID = p_item_id AND PREPARATION_ID = p_preparation_id;
+        IF SQL%ROWCOUNT = 0 THEN
+            RAISE_APPLICATION_ERROR(-20010, 'Item not found in this preparation.');
+        END IF;
+    EXCEPTION WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Preparation not found.');
+    END set_item_state;
+END PKG_CHECKLIST;
+/
+
+CREATE OR REPLACE TRIGGER TRG_PT_ITEM_GUARD
+BEFORE UPDATE OF PREPARATION_ID ON PT_PREPARATION_ITEM
+FOR EACH ROW
+BEGIN
+    IF :NEW.PREPARATION_ID IS NULL OR :NEW.PREPARATION_ID <> :OLD.PREPARATION_ID THEN
+        RAISE_APPLICATION_ERROR(-20012, 'An item cannot be moved to another preparation.');
+    END IF;
+END;
+/
+
+DECLARE
+    v_valid NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_valid FROM USER_OBJECTS
+    WHERE ((OBJECT_NAME = 'PKG_CHECKLIST' AND OBJECT_TYPE IN ('PACKAGE', 'PACKAGE BODY'))
+       OR (OBJECT_NAME = 'TRG_PT_ITEM_GUARD' AND OBJECT_TYPE = 'TRIGGER')) AND STATUS = 'VALID';
+    IF v_valid <> 3 THEN
+        FOR compilation_error IN (SELECT NAME, LINE, POSITION, TEXT FROM USER_ERRORS
+                                  WHERE NAME IN ('PKG_CHECKLIST', 'TRG_PT_ITEM_GUARD') ORDER BY NAME, SEQUENCE) LOOP
+            DBMS_OUTPUT.PUT_LINE(compilation_error.NAME || ' ' || compilation_error.LINE || ':'
+                || compilation_error.POSITION || ' ' || compilation_error.TEXT);
+        END LOOP;
+        RAISE_APPLICATION_ERROR(-20998, 'Checklist package or item guard failed to compile.');
+    END IF;
+END;
+/
+
+PROMPT 11. Test checklist rules and item guard
+
+DECLARE
+    v_count NUMBER;
+    v_error NUMBER;
+    v_audit_before NUMBER;
+    v_checks PLS_INTEGER := 0;
+
+    PROCEDURE assert_number(p_actual NUMBER, p_expected NUMBER, p_label VARCHAR2) IS
+    BEGIN
+        IF p_actual IS NULL OR p_actual <> p_expected THEN
+            RAISE_APPLICATION_ERROR(-20999, p_label || ': expected ' || p_expected || ', received ' || NVL(TO_CHAR(p_actual), 'NULL'));
+        END IF;
+        v_checks := v_checks + 1;
+    END;
+
+    PROCEDURE expect_pending_error(p_id NUMBER, p_expected NUMBER) IS
+        v_result NUMBER;
+        v_code NUMBER := 0;
+    BEGIN
+        BEGIN
+            v_result := PKG_CHECKLIST.pending_required_count(p_id);
+        EXCEPTION WHEN OTHERS THEN
+            v_code := SQLCODE;
+        END;
+        assert_number(v_code, p_expected, 'Pending count error');
+    END;
+
+    PROCEDURE expect_state_error(p_owner VARCHAR2, p_preparation NUMBER, p_item NUMBER, p_state NUMBER, p_expected NUMBER) IS
+        v_code NUMBER := 0;
+    BEGIN
+        SAVEPOINT invalid_checklist_call;
+        BEGIN
+            PKG_CHECKLIST.set_item_state(p_owner, p_preparation, p_item, p_state);
+        EXCEPTION WHEN OTHERS THEN
+            v_code := SQLCODE;
+        END;
+        ROLLBACK TO invalid_checklist_call;
+        assert_number(v_code, p_expected, 'State change error');
+    END;
+BEGIN
+    SAVEPOINT checklist_test;
+    SELECT COUNT(*) INTO v_audit_before FROM PT_ITEM_AUDIT;
+    assert_number(PKG_CHECKLIST.pending_required_count(101), 2, 'Two required pending items');
+    assert_number(PKG_CHECKLIST.pending_required_count(102), 1, 'Partially completed checklist');
+    assert_number(PKG_CHECKLIST.pending_required_count(103), 0, 'Optional pending item excluded');
+    assert_number(PKG_CHECKLIST.pending_required_count(104), 2, 'Second service');
+    assert_number(PKG_CHECKLIST.pending_required_count(105), 0, 'Completed checklist');
+    assert_number(PKG_CHECKLIST.pending_required_count(106), 0, 'Only optional items');
+    assert_number(PKG_CHECKLIST.pending_required_count(107), 0, 'Empty checklist');
+
+    expect_pending_error(NULL, -20002);
+    expect_pending_error(0, -20002);
+    expect_pending_error(-1, -20002);
+    expect_pending_error(1.5, -20002);
+    expect_pending_error(1000000000000000000, -20002);
+    expect_pending_error(999999, -20003);
+
+    PKG_CHECKLIST.set_item_state('fixture-citizen-a', 101, 101, 1);
+    assert_number(PKG_CHECKLIST.pending_required_count(101), 1, 'Complete first required item');
+    assert_number(PKG_PREPARATION.completion_percentage(101), 50, 'Progress after update');
+    SELECT COUNT(*) INTO v_count FROM PT_ITEM_AUDIT
+    WHERE ITEM_ID = 101 AND OPERATION = 'UPDATE' AND OLD_COMPLETED = 0 AND NEW_COMPLETED = 1
+      AND OCCURRED_AT IS NOT NULL AND DATABASE_USER IS NOT NULL;
+    assert_number(v_count, 1, 'State change audited with old and new values');
+
+    PKG_CHECKLIST.set_item_state('fixture-citizen-a', 101, 101, 1);
+    assert_number(PKG_CHECKLIST.pending_required_count(101), 1, 'Repeated state keeps the result');
+    PKG_CHECKLIST.set_item_state('fixture-citizen-a', 101, 103, 0);
+    assert_number(PKG_CHECKLIST.pending_required_count(101), 1, 'Optional item does not change pending count');
+    PKG_CHECKLIST.set_item_state('fixture-citizen-a', 101, 102, 1);
+    assert_number(PKG_PREPARATION.completion_percentage(101), 100, 'All required items completed');
+    PKG_CHECKLIST.set_item_state('fixture-citizen-a', 101, 101, 0);
+    assert_number(PKG_CHECKLIST.pending_required_count(101), 1, 'Reopen a required item');
+
+    expect_state_error('fixture-citizen-a', NULL, 101, 1, -20002);
+    expect_state_error(NULL, 101, 101, 1, -20004);
+    expect_state_error('   ', 101, 101, 1, -20004);
+    expect_state_error(RPAD('x', 129, 'x'), 101, 101, 1, -20004);
+    expect_state_error('another-owner', 101, 101, 1, -20009);
+    expect_state_error('fixture-citizen-a', 101, NULL, 1, -20008);
+    expect_state_error('fixture-citizen-a', 101, 0, 1, -20008);
+    expect_state_error('fixture-citizen-a', 101, 1.5, 1, -20008);
+    expect_state_error('fixture-citizen-a', 101, 1000000000000000000, 1, -20008);
+    expect_state_error('fixture-citizen-a', 101, 104, 1, -20010);
+    expect_state_error('fixture-citizen-a', 101, 999999, 1, -20010);
+    expect_state_error('fixture-citizen-a', 999999, 101, 1, -20003);
+    expect_state_error('fixture-citizen-a', 101, 101, NULL, -20011);
+    expect_state_error('fixture-citizen-a', 101, 101, 2, -20011);
+    expect_state_error('fixture-citizen-a', 101, 101, 0.5, -20011);
+
+    SAVEPOINT transfer_test;
+    v_error := 0;
+    BEGIN
+        UPDATE PT_PREPARATION_ITEM SET PREPARATION_ID = 102 WHERE ID = 101;
+    EXCEPTION WHEN OTHERS THEN
+        v_error := SQLCODE;
+    END;
+    ROLLBACK TO transfer_test;
+    assert_number(v_error, -20012, 'Transfer between preparations blocked');
+    SELECT PREPARATION_ID INTO v_count FROM PT_PREPARATION_ITEM WHERE ID = 101;
+    assert_number(v_count, 101, 'Original preparation preserved');
+
+    ROLLBACK TO checklist_test;
+    assert_number(PKG_CHECKLIST.pending_required_count(101), 2, 'Item updates rolled back');
+    SELECT COUNT(*) INTO v_count FROM PT_ITEM_AUDIT;
+    assert_number(v_count, v_audit_before, 'Audit updates rolled back');
+    DBMS_OUTPUT.PUT_LINE('PKG_CHECKLIST and TRG_PT_ITEM_GUARD: ' || v_checks || ' checks OK; test data rolled back.');
+EXCEPTION WHEN OTHERS THEN
+    ROLLBACK TO checklist_test;
+    RAISE;
+END;
+/
+ROLLBACK;
+
+PROMPT 12. Business block 1 - Preparation progress
 
 DECLARE
     v_percentage NUMBER;
@@ -739,7 +961,27 @@ BEGIN
 END;
 /
 
-PROMPT 11. Report 1 - Services by category
+PROMPT 13. Business block 2 - Required pending items
+
+DECLARE
+    v_pending NUMBER;
+BEGIN
+    FOR preparation IN (SELECT ID, TITLE FROM PT_PREPARATION ORDER BY ID) LOOP
+        v_pending := PKG_CHECKLIST.pending_required_count(preparation.ID);
+        IF v_pending > 0 THEN
+            DBMS_OUTPUT.PUT_LINE('Preparation ' || preparation.ID || ' | ' || preparation.TITLE || ' | pending: ' || v_pending);
+            FOR item IN (SELECT TITLE FROM PT_PREPARATION_ITEM
+                         WHERE PREPARATION_ID = preparation.ID AND REQUIRED = 1 AND COMPLETED = 0 ORDER BY ID) LOOP
+                DBMS_OUTPUT.PUT_LINE('  - ' || item.TITLE);
+            END LOOP;
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('Preparation ' || preparation.ID || ' | no required pending items.');
+        END IF;
+    END LOOP;
+END;
+/
+
+PROMPT 14. Report 1 - Services by category
 
 SELECT category.ID AS CATEGORY_ID,
        category.NAME AS CATEGORY_NAME,
@@ -748,5 +990,37 @@ SELECT category.ID AS CATEGORY_ID,
 FROM PT_SERVICE service
 JOIN PT_CATEGORY category ON category.ID = service.CATEGORY_ID
 ORDER BY category.ID, service.ID;
+
+PROMPT 15. Report 2 - Preparations with required pending items
+
+SELECT preparation.ID AS PREPARATION_ID, preparation.TITLE, preparation.OWNER_SUBJECT
+FROM PT_PREPARATION preparation
+WHERE EXISTS (
+    SELECT 1 FROM PT_PREPARATION_ITEM item
+    WHERE item.PREPARATION_ID = preparation.ID AND item.REQUIRED = 1 AND item.COMPLETED = 0
+)
+ORDER BY preparation.ID;
+
+PROMPT 16. Report 3 - Progress and source version
+
+WITH item_counts AS (
+    SELECT preparation.ID AS PREPARATION_ID, preparation.TITLE,
+           preparation.SOURCE_VERSION, known_version.VERSION AS CURRENT_VERSION,
+           COUNT(item.ID) AS TOTAL_ITEMS,
+           COUNT(CASE WHEN item.REQUIRED = 1 THEN 1 END) AS REQUIRED_ITEMS,
+           COUNT(CASE WHEN item.REQUIRED = 1 AND item.COMPLETED = 0 THEN 1 END) AS PENDING_REQUIRED_ITEMS
+    FROM PT_PREPARATION preparation
+    LEFT JOIN PT_PREPARATION_ITEM item ON item.PREPARATION_ID = preparation.ID
+    LEFT JOIN PT_SERVICE_VERSION known_version ON known_version.SERVICE_ID = preparation.SERVICE_ID
+    GROUP BY preparation.ID, preparation.TITLE, preparation.SOURCE_VERSION, known_version.VERSION
+)
+SELECT PREPARATION_ID, TITLE, TOTAL_ITEMS, REQUIRED_ITEMS, PENDING_REQUIRED_ITEMS,
+       CASE WHEN REQUIRED_ITEMS = 0 THEN 0
+            ELSE ROUND(100 * (REQUIRED_ITEMS - PENDING_REQUIRED_ITEMS) / REQUIRED_ITEMS, 2) END AS COMPLETION_PERCENT,
+       CASE WHEN REQUIRED_ITEMS > 0 AND PENDING_REQUIRED_ITEMS = 0 THEN 1 ELSE 0 END AS READY,
+       CASE WHEN CURRENT_VERSION > SOURCE_VERSION THEN 1 ELSE 0 END AS SOURCE_OUTDATED,
+       SOURCE_VERSION, CURRENT_VERSION
+FROM item_counts
+ORDER BY PREPARATION_ID;
 
 PROMPT Installation complete.

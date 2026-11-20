@@ -15,4 +15,4 @@ Projeto Azure DevOps: https://dev.azure.com/RM561584/PaperTrail-GS-2026-2
 GitHub Java: https://github.com/Paper-Trail-GS-2026/Java-Advanced-Paper-Trial
 GitHub .NET: https://github.com/Paper-Trail-GS-2026/.Net-Paper-Trial
 
-Vídeo no YouTube: a incluir após a gravação.
+Vídeo no YouTube: https://www.youtube.com/watch?v=CRfGrDgIHB8
